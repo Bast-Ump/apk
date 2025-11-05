@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Jeu du Pendu</title>
+<style>
+    body {
+        font-family: 'Arial', sans-serif;
+        background: linear-gradient(to bottom, #b3e5fc, #e1f5fe);
+        margin: 0;
+        min-height: 100vh;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        padding: 15px;
+    }
+
+    .container {
+        background: white;
+        padding: 20px;
+        border-radius: 12px;
+        box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+        width: 100%;
+        max-width: 420px;
+        text-align: center;
+    }
+
+    h1 {
+        color: #0277bd;
+        font-size: 1.6em;
+        margin-bottom: 10px;
+    }
+
+    #wordDisplay {
+        font-size: 1.8em;
+        letter-spacing: 8px;
+        margin: 20px 0;
+        word-wrap: break-word;
+    }
+
+    #lettersUsed {
+        margin-top: 10px;
+        font-size: 1em;
+        word-wrap: break-word;
+    }
+
+    #hint {
+        margin-top: 12px;
+        font-weight: bold;
+        color: #388e3c;
+        display: none;
+    }
+
+    button {
+        background: #0288d1;
+        color: white;
+        border: none;
+        padding: 12px 18px;
+        border-radius: 8px;
+        cursor: pointer;
+        font-size: 1em;
+        margin-top: 10px;
+        transition: background 0.3s;
+        width: 100%;
+        max-width: 200px;
+    }
+
+    button:hover {
+        background: #01579b;
+    }
+
+    input {
+        padding: 10px;
+        font-size: 1.1em;
+        width: 60%;
+        max-width: 180px;
+        border: 2px solid #0288d1;
+        border-radius: 6px;
+        text-align: center;
+    }
+
+    #pendu {
+        font-family: monospace;
+        white-space: pre;
+        margin-top: 20px;
+        font-size: 0.9em;
+    }
+
+    #resultImage {
+        margin-top: 20px;
+        display: none;
+        animation: fadeIn 1.5s ease-in-out;
+    }
+
+    #resultImage img {
+        width: 100%;
+        max-width: 320px;
+        border-radius: 10px;
+        box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+    }
+
+    #babyDate {
+        font-size: 1.1em;
+        color: #444;
+        margin-top: 10px;
+        font-weight: bold;
+    }
+
+    #message {
+        margin-top: 10px;
+        font-weight: bold;
+        font-size: 1.1em;
+    }
+
+    @keyframes fadeIn {
+        from { opacity: 0; transform: scale(0.95); }
+        to { opacity: 1; transform: scale(1); }
+    }
+</style>
+</head>
+<body>
+<div class="container">
+    <h1>🪢 Jeu du Pendu</h1>
+
+    <p>Devine le mot caché !</p>
+    <div id="wordDisplay"></div>
+    <input type="text" id="letterInput" maxlength="1" placeholder="Lettre..." inputmode="text" autocomplete="off">
+    <button id="guessBtn">Proposer</button>
+    <div id="lettersUsed"></div>
+    <div id="pendu"></div>
+    <div id="message"></div>
+    <div id="hint">💡 Indice : changement</div>
+
+    <!-- ✅ Résultat avec photo + date -->
+    <div id="resultImage">
+        <img src="https://iili.io/KZjwKV1.jpg" alt="Résultat">
+        <div id="babyDate">Prévu pour le 22/01/2016 💖</div>
+    </div>
+
+    <button id="restartBtn" style="display:none;">Rejouer 🔁</button>
+</div>
+
+<script>
+const secretWord = "bebe"; // mot à deviner
+let displayWord = Array(secretWord.length).fill("_");
+let lettersUsed = [];
+let errors = 0;
+const maxErrors = 6;
+
+const wordDisplay = document.getElementById('wordDisplay');
+const letterInput = document.getElementById('letterInput');
+const guessBtn = document.getElementById('guessBtn');
+const lettersUsedDiv = document.getElementById('lettersUsed');
+const penduDiv = document.getElementById('pendu');
+const messageDiv = document.getElementById('message');
+const restartBtn = document.getElementById('restartBtn');
+const resultImage = document.getElementById('resultImage');
+const hintDiv = document.getElementById('hint');
+
+const penduStages = [
+    `
+    
+    
+      
+      
+    ========`,
+    `
+      
+      |
+      |
+      |
+    ========`,
+    `
+  +---+
+      |
+      |
+      |
+    ========`,
+    `
+  +---+
+  |   |
+      |
+      |
+    ========`,
+    `
+  +---+
+  |   |
+  O   |
+      |
+    ========`,
+    `
+  +---+
+  |   |
+  O   |
+ /|\\  |
+      |
+    ========`,
+    `
+  +---+
+  |   |
+  O   |
+ /|\\  |
+ / \\  |
+    ========`
+];
+
+// 🎮 Gestion des événements
+guessBtn.addEventListener('click', guessLetter);
+letterInput.addEventListener('keypress', e => { if(e.key === "Enter") guessLetter(); });
+
+function guessLetter() {
+    const letter = letterInput.value.toLowerCase().trim();
+    if(!letter.match(/[a-zàâçéèêëîïôûùüÿñæœ]/i)) {
+        alert("Merci d’entrer une lettre valide !");
+        letterInput.value = "";
+        return;
+    }
+    if(lettersUsed.includes(letter)) {
+        alert("Lettre déjà utilisée !");
+        letterInput.value = "";
+        return;
+    }
+
+    lettersUsed.push(letter);
+
+    if(secretWord.includes(letter)) {
+        for(let i=0; i<secretWord.length; i++){
+            if(secretWord[i] === letter) {
+                displayWord[i] = letter;
+            }
+        }
+    } else {
+        errors++;
+    }
+
+    // ✅ Afficher l'indice après 4 erreurs
+    if(errors === 4) {
+        hintDiv.style.display = "block";
+    }
+
+    updateDisplay();
+    letterInput.value = "";
+    letterInput.focus();
+
+    if(!displayWord.includes("_")) {
+        messageDiv.textContent = "🎉 Bravo ! Tu as trouvé le mot : " + secretWord.toUpperCase();
+        resultImage.style.display = "block"; // ✅ affiche l’image + date
+        endGame();
+    } else if(errors >= maxErrors) {
+        messageDiv.textContent = "💀 Perdu ! Le mot était : " + secretWord.toUpperCase();
+        endGame();
+    }
+}
+
+function updateDisplay() {
+    wordDisplay.textContent = displayWord.join(" ");
+    lettersUsedDiv.textContent = "Lettres utilisées : " + lettersUsed.join(", ");
+    penduDiv.textContent = penduStages[errors];
+}
+
+function endGame() {
+    guessBtn.disabled = true;
+    letterInput.disabled = true;
+    restartBtn.style.display = "inline-block";
+}
+
+restartBtn.addEventListener('click', () => {
+    displayWord = Array(secretWord.length).fill("_");
+    lettersUsed = [];
+    errors = 0;
+    guessBtn.disabled = false;
+    letterInput.disabled = false;
+    restartBtn.style.display = "none";
+    messageDiv.textContent = "";
+    resultImage.style.display = "none";
+    hintDiv.style.display = "none";
+    letterInput.focus();
+    updateDisplay();
+});
+
+updateDisplay();
+letterInput.focus();
+</script>
+</body>
+</html>
